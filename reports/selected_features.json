@@ -1,0 +1,10 @@
+{
+  "All_Features": [
+    "bytes",
+    "pkts",
+    "duration",
+    "iat_mean",
+    "iat_std"
+  ],
+  "Features_Count": 5
+}

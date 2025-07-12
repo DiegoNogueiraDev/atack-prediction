@@ -1,0 +1,214 @@
+# Pipeline Configuration for Attack Detection
+# Based on EDA findings from eda.ipynb
+
+# Data Configuration
+data:
+  input_file: 'data/processed/flows.csv'
+  output_dir: 'reports/'
+  figures_dir: 'figures/'
+  
+  # Feature columns from EDA
+  numeric_features:
+    - bytes
+    - pkts
+    - duration
+    - iat_mean
+    - iat_std
+  
+  target_column: 'label'
+  
+  # Train/validation split
+  test_size: 0.2
+  validation_size: 0.2
+  random_state: 42
+
+# Preprocessing Configuration
+preprocessing:
+  # Outlier detection parameters (based on EDA consensus analysis)
+  outlier_detection:
+    methods:
+      - iqr
+      - zscore
+      - modified_zscore
+    zscore_threshold: 3.0
+    modified_zscore_threshold: 3.5
+    consensus_threshold: 2  # Remove outliers detected by at least 2 methods
+    remove_from_normal_only: true  # Only remove outliers from normal traffic
+  
+  # Transformations based on EDA skewness analysis
+  transformations:
+    # Apply to features with |skew| > 1
+    log_transform:
+      enabled: true
+      features: []  # To be filled based on EDA results
+      method: 'log1p'  # log(1+x) to handle zeros
+    
+    box_cox:
+      enabled: true
+      features: []  # For positive values only
+    
+    yeo_johnson:
+      enabled: true
+      features: []  # Most robust, handles negative values
+  
+  # Normalization strategy
+  scaling:
+    method: 'standard'  # StandardScaler recommended for autoencoders
+    # alternative: 'minmax' for features already well-distributed
+  
+  # Feature selection based on statistical tests
+  feature_selection:
+    enabled: true
+    method: 'statistical'
+    significance_threshold: 0.05
+    effect_size_threshold: 0.5  # Cohen's d threshold
+    correlation_threshold: 0.9   # Remove highly correlated features
+
+# Autoencoder Configuration
+model:
+  architecture:
+    # Based on PCA analysis and feature count
+    input_dim: null  # Will be set based on selected features
+    encoder_layers: [32, 16, 8]  # Progressive reduction
+    bottleneck_dim: 5  # Based on PCA analysis (captures ~95% variance)
+    decoder_layers: [8, 16, 32]  # Symmetric expansion
+    
+  # Activation functions
+  activation:
+    hidden: 'relu'
+    output: 'linear'
+  
+  # Training parameters
+  training:
+    epochs: 100
+    batch_size: 32
+    learning_rate: 0.001
+    optimizer: 'adam'
+    early_stopping:
+      enabled: true
+      patience: 10
+      monitor: 'val_loss'
+      min_delta: 0.001
+    
+    # Loss function
+    loss: 'mse'  # Mean Squared Error for reconstruction
+    
+    # Validation
+    validation_split: 0.2
+    shuffle: true
+
+# Detection Configuration
+detection:
+  # Threshold calculation based on normal traffic reconstruction error
+  threshold:
+    method: 'percentile'
+    percentile: 95  # 95th percentile of normal traffic reconstruction error
+    # alternative methods: 'std_multiplier', 'fixed'
+    
+    # For std_multiplier method
+    std_multiplier: 2.5
+    
+    # For fixed method
+    fixed_value: 0.1
+  
+  # Evaluation metrics
+  metrics:
+    - 'precision'
+    - 'recall'
+    - 'f1_score'
+    - 'roc_auc'
+    - 'pr_auc'
+    - 'accuracy'
+  
+  # Performance targets (based on EDA analysis)
+  targets:
+    min_accuracy: 0.85
+    min_precision: 0.80
+    min_recall: 0.90
+    min_f1_score: 0.85
+    min_roc_auc: 0.95
+    max_false_positive_rate: 0.05
+
+# Visualization Configuration
+visualization:
+  save_plots: true
+  plot_format: 'png'
+  plot_dpi: 300
+  
+  # Plots to generate during training/evaluation
+  plots:
+    - 'loss_curves'
+    - 'reconstruction_error_distribution'
+    - 'roc_curve'
+    - 'precision_recall_curve'
+    - 'confusion_matrix'
+    - 'latent_space_visualization'
+    - 'feature_importance'
+
+# Logging Configuration
+logging:
+  level: 'INFO'
+  log_file: 'logs/training.log'
+  
+  # MLflow tracking (optional)
+  mlflow:
+    enabled: false
+    experiment_name: 'attack_detection_autoencoder'
+    
+# Hyperparameter Tuning (optional)
+hyperparameter_tuning:
+  enabled: false
+  method: 'grid_search'  # or 'random_search', 'bayesian'
+  
+  # Parameters to tune
+  parameters:
+    bottleneck_dim: [3, 5, 8]
+    learning_rate: [0.001, 0.01, 0.1]
+    batch_size: [16, 32, 64]
+    
+  # Tuning configuration
+  cv_folds: 5
+  scoring: 'roc_auc'
+  n_iter: 50  # For random search
+
+# Deployment Configuration
+deployment:
+  model_format: 'pickle'  # or 'joblib', 'tensorflow'
+  model_path: 'model/autoencoder_model.pkl'
+  
+  # Model versioning
+  versioning:
+    enabled: true
+    version_format: 'v{major}.{minor}.{patch}'
+    
+  # Performance monitoring
+  monitoring:
+    enabled: false
+    drift_detection: true
+    performance_threshold: 0.05  # Alert if performance drops by 5%
+
+# Reproducibility
+reproducibility:
+  random_seed: 42
+  set_deterministic: true
+  
+# Hardware Configuration
+hardware:
+  use_gpu: false  # Set to true if GPU available
+  n_jobs: -1  # Use all available CPUs
+  memory_limit: '8GB'
+
+# Data Quality Checks
+data_quality:
+  checks:
+    - 'missing_values'
+    - 'data_types'
+    - 'outliers'
+    - 'feature_correlations'
+    - 'target_distribution'
+  
+  # Thresholds for quality checks
+  thresholds:
+    max_missing_percentage: 0.05
+    max_correlation: 0.95
+    min_samples_per_class: 100
