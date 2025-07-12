@@ -1,0 +1,23 @@
+O fato de o modelo acertar 100 % nas imagens de limão Taiti e de laranja Bahia reflete basicamente duas coisas: 
+essas variedades aparecem em grande número e exibem características visuais bastante homogêneas no conjunto de treino, 
+o que facilita a extração de filtros convolucionais capazes de capturar cor, padrão de casca e forma. 
+Já limões Rosa e Siciliano ou laranjas Pera e Champanhe têm matizes, 
+texturas e contornos mais sutis e foram pouco representados durante o treinamento; 
+por isso, a rede aprendeu muito bem o que define um Taiti ou uma Bahia, mas não teve exemplos suficientes 
+para generalizar para essas outras espécies, resultando numa acurácia em torno de 50 %.
+
+Por sua vez, a incapacidade total de reconhecer corretamente frutas fora do universo dos cítricos decorre de um 
+desequilíbrio extremo no dataset: enquanto existem cerca de 1 450 imagens de cada cítrico principal, a classe 
+“outras frutas” conta com apenas 105 exemplos para representar maçãs, bananas, mangas e muitos outros frutos. 
+Diante desse cenário, a rede minimiza sua função de perda rotulando sistematicamente tudo como limão ou laranja, 
+afinal, é muito mais vantajoso, em termos de número de acertos, permanecer nas classes majoritárias do que arriscar 
+reconhecer corretamente um exemplo raro.
+
+Para que a rede aprenda de fato as peculiaridades de cada variedade e passe a identificar corretamente quando não 
+se trata de um cítrico, é imprescindível enriquecer o conjunto de treino com um volume maior 
+de imagens das espécies sub-representadas e das demais frutas. Eu recomendaria incluir, 
+no mínimo, 300 a 500 fotos adicionais de cada limão Rosa, limão Siciliano, laranja Pera e laranja Champanhe, 
+além de elevar a classe “outras frutas” para algo em torno de mil exemplos, cobrindo bem a diversidade de maçã, 
+banana, mamão, uva, abacaxi etc. Somado a isso, usar data augmentation, como rotações, recortes, variações de brilho 
+e contraste nas novas imagens ajuda ainda mais a rede a aprender variações de ângulo e iluminação, entregando 
+um modelo mais robusto e capaz de diferenciar corretamente qualquer fruto.

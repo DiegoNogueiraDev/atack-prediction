@@ -1,0 +1,16 @@
+1. Data augmentation específico para folhas doentes
+   • Aplique rotações, espelhamentos, cortes, zooms, ajustes de brilho/contraste e ruído 
+   apenas às imagens de folhas com ferrugem, gerando “variações” que ajudem a rede a 
+   aprender padrões sob diferentes perspectivas sem precisar de fotos novas.
+
+2. Rebalanceamento no treinamento e perda ponderada
+   • Durante o treino, apresente mais vezes (oversampling) as imagens doentes ou reduza (undersampling) 
+   as sadias para igualar as classes;
+   • Use pesos maiores na função de perda para erros na classe “folha doente” (ou adote uma focal loss) 
+   de modo a forçar o modelo a dar mais atenção ao reconhecimento de ferrugem.
+
+3. Transfer learning e fine-tuning de rede pré-treinada
+   • Parta de um modelo já treinado em grandes bases de imagens (por exemplo, EfficientNet ou ResNet no ImageNet) 
+   e reaproveite suas camadas iniciais como extrator de características;
+   • Ajuste (treine) apenas as camadas finais com sua base de 1.700 + 300 imagens, 
+   melhorando a capacidade de generalização mesmo com poucos exemplos da classe minoritária.

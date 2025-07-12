@@ -1,0 +1,6 @@
+Não. A operação de convolução não se restringe a imagens: 
+ela é um filtro local que pode ser aplicado a qualquer dado organizado em grades ou sequências. 
+Por exemplo, usamos convolução 1D em séries temporais e sinais de áudio, 2D em imagens, 
+3D em volumes médicos ou vídeos, e existem extensões (Graph Convolutional Networks) que a adaptam a grafos. 
+O fundamental é deslizar um pequeno kernel sobre a estrutura do dado para extrair padrões locais, 
+independentemente de ser pixel, amostra temporal ou nó de grafo.
