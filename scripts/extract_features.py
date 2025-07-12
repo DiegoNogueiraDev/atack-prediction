@@ -2,7 +2,6 @@
 # scripts/extract_features.py
 
 import logging
-from tqdm import tqdm
 import pyshark
 import pandas as pd
 
