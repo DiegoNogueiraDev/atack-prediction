@@ -3,10 +3,3 @@ __pycache__/
 *.py[cod]
 env/
 .env
-
-# Modelos e logs
-model/
-logs/
-
-# VSCode
-.vscode/
