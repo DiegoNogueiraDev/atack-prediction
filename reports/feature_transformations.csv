@@ -1,0 +1,6 @@
+Feature,Skew_Original,Normalidade_Original,Transformação_Recomendada,Skew_Transformado,Normalidade_Transformada,Melhoria_Skew
+bytes,33.06850003107406,Não Normal,Box-Cox(λ=-0.200),0.09717178045125512,Não Normal,32.971328250622804
+pkts,28.738061938068945,Não Normal,Box-Cox(λ=-0.394),0.1284124041661885,Não Normal,28.609649533902758
+duration,2.415192077405019,Não Normal,Yeo-Johnson,0.6893775652759595,Não Normal,1.7258145121290596
+iat_mean,6.384812829331284,Não Normal,Yeo-Johnson,0.9710814176763827,Não Normal,5.413731411654901
+iat_std,1.2093199248581592,Não Normal,Nenhuma,1.2093199248581592,Não Normal,0.0

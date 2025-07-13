@@ -6,5 +6,11 @@
     "iat_mean",
     "iat_std"
   ],
-  "Features_Count": 5
+  "Significant_Features": [
+    "bytes",
+    "pkts",
+    "iat_mean"
+  ],
+  "Features_Count": 5,
+  "Significant_Count": 3
 }
