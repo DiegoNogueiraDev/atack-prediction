@@ -25,7 +25,7 @@ sns.set_palette("husl")
 class AnomalyDetector:
     """Classe para detecção de anomalias usando autoencoder treinado"""
     
-    def __init__(self, model_dir='model', config_path='config/model_config.yaml'):
+    def __init__(self, model_dir='model', config_path=None):
         self.model_dir = Path(model_dir)
         self.fig_dir = self.model_dir / 'figures'
         self.fig_dir.mkdir(parents=True, exist_ok=True)
@@ -43,7 +43,23 @@ class AnomalyDetector:
         self._load_model_artifacts()
         
     def _load_config(self, config_path):
-        """Carregar configuração YAML"""
+        """Carregar configuração YAML ou do modelo salvo"""
+        # Se config_path não especificado, tentar carregar do modelo
+        if config_path is None:
+            model_config_path = self.model_dir / 'model_config.pkl'
+            if model_config_path.exists():
+                try:
+                    import pickle
+                    with open(model_config_path, 'rb') as f:
+                        saved_config = pickle.load(f)
+                    print(f"✅ Configuração carregada do modelo salvo em {model_config_path}")
+                    return saved_config['config_used']
+                except Exception as e:
+                    print(f"❌ Erro ao carregar config do modelo: {e}")
+                    config_path = 'config/model_config.yaml'  # fallback
+            else:
+                config_path = 'config/model_config.yaml'  # fallback
+        
         try:
             with open(config_path, 'r', encoding='utf-8') as f:
                 config = yaml.safe_load(f)
@@ -227,6 +243,25 @@ class AnomalyDetector:
             
         except Exception as e:
             print(f"❌ Erro ao salvar relatórios: {e}")
+            raise
+    
+    def save_test_artifacts(self, errors, y_true):
+        """Salvar artifacts para threshold sweep"""
+        import pickle
+        try:
+            # Salvar errors e labels para threshold sweep
+            errors_path = self.model_dir / 'test_errors.pkl'
+            labels_path = self.model_dir / 'test_labels.pkl'
+            
+            with open(errors_path, 'wb') as f:
+                pickle.dump(errors, f)
+            with open(labels_path, 'wb') as f:
+                pickle.dump(y_true, f)
+                
+            print(f"✅ Test artifacts salvos para threshold sweep")
+            
+        except Exception as e:
+            print(f"❌ Erro ao salvar test artifacts: {e}")
             raise
     
     def create_plots(self, y_true, errors, metrics):
@@ -435,6 +470,9 @@ class AnomalyDetector:
             # 6. Criar visualizações
             self.create_plots(y_true, errors, metrics)
             
+            # 7. Salvar artifacts para threshold sweep
+            self.save_test_artifacts(errors, y_true)
+            
             print("\n🎉 Avaliação completa finalizada com sucesso!")
             print(f"📁 Resultados salvos em: {self.fig_dir}")
             
@@ -448,7 +486,7 @@ def main():
     """Função principal"""
     try:
         # Criar detector
-        detector = AnomalyDetector()
+        detector = AnomalyDetector(model_dir='model_v3')
         
         # Executar avaliação completa
         metrics = detector.run_full_evaluation()

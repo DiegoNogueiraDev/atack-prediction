@@ -1,0 +1,72 @@
+model_name: "sequence_autoencoder_v4"
+version: "4.0"
+description: "LSTM-Attention Sequence Autoencoder for temporal pattern detection"
+
+# Data configuration
+features_used: ['bytes', 'pkts', 'iat_mean', 'duration', 'iat_std']
+sequence_length: 10  # Number of consecutive flows to consider
+overlap: 5  # Overlap between sequences for data augmentation
+normalize_sequences: true
+
+# Model architecture
+architecture:
+  encoder:
+    lstm_units: [64, 32]  # Two LSTM layers
+    attention: true
+    dropout: 0.3
+    return_sequences: true
+    
+  bottleneck:
+    units: 8  # Compressed representation
+    activation: 'tanh'
+    
+  decoder:
+    lstm_units: [32, 64]  # Mirror encoder
+    attention: true
+    dropout: 0.3
+    return_sequences: true
+    
+  output:
+    units: 5  # Reconstruct original features
+    activation: 'linear'
+
+# Training configuration
+training:
+  batch_size: 32
+  epochs: 100
+  learning_rate: 0.001
+  patience: 15
+  validation_split: 0.2
+  
+  # Advanced training strategies
+  reduce_lr_patience: 8
+  reduce_lr_factor: 0.5
+  min_lr: 1e-6
+  
+  # Callbacks
+  early_stopping: true
+  model_checkpoint: true
+  tensorboard: true
+
+# Loss function
+loss: 'mse'
+metrics: ['mae']
+
+# Sequence processing
+sequence_processing:
+  padding: 'post'  # Pad sequences at the end
+  mask_value: 0.0  # Value for padding
+  shuffle_sequences: true
+  
+# Anomaly detection
+anomaly_detection:
+  method: 'reconstruction_error'
+  aggregation: 'mean'  # How to aggregate errors across sequence
+  threshold_method: 'percentile'  # or 'statistical'
+  threshold_percentile: 95
+  
+# Feature engineering for sequences
+feature_engineering:
+  sequence_stats: true  # Add min, max, std across sequence
+  temporal_features: true  # Add time-based features
+  attention_weights: true  # Use attention for interpretation

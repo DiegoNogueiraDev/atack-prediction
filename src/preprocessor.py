@@ -9,12 +9,12 @@ from sklearn.impute import SimpleImputer
 
 # Configuração das features baseada no EDA
 # Features significativas: bytes, pkts, iat_mean
-# Features removidas: duration, iat_std (não significativas)
+# Features extras para teste: duration, iat_std
 SELECTED_FEATURES = ['bytes', 'pkts', 'iat_mean']
 
-# Features por tipo de transformação (baseado no EDA)
+# Features por tipo de transformação (baseado no EDA e extensões)
 FEATURES_BOXCOX = ['bytes']  # Apenas valores positivos
-FEATURES_YEOJOHNSON = ['pkts', 'iat_mean']  # Pode ter zeros
+FEATURES_YEOJOHNSON = ['pkts', 'iat_mean', 'iat_std', 'duration']  # Pode ter zeros
 FEATURES_ALL = FEATURES_BOXCOX + FEATURES_YEOJOHNSON
 
 def create_preprocessor(features_to_use=None, apply_transformations=True):
