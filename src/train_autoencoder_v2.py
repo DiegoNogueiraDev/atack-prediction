@@ -20,7 +20,7 @@ from tensorflow.keras import layers, Model
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, ReduceLROnPlateau
 from tensorflow.keras.optimizers import Adam
 
-from src.preprocessor import (
+from preprocessor import (
     fit_preprocessor, 
     transform_preprocessor, 
     get_eda_config,
@@ -81,14 +81,9 @@ def load_and_filter_data(config):
     df_norm = df[df.label == normal_label].reset_index(drop=True)
     print(f"Tráfego normal para treinamento: {df_norm.shape[0]} fluxos")
     
-    # Determinar features a usar
-    if config['features']['use_only_significant']:
-        features_to_use = config['features']['significant']
-        print(f"✅ Usando apenas features significativas: {features_to_use}")
-    else:
-        # Usar todas as features numéricas disponíveis
-        features_to_use = SELECTED_FEATURES
-        print(f"✅ Usando todas as features: {features_to_use}")
+    # Usar features especificadas no config
+    features_to_use = config['features_used']
+    print(f"✅ Usando features: {features_to_use}")
     
     return df_norm, features_to_use
 
@@ -99,20 +94,14 @@ def remove_outliers(X, threshold=4.0):
     return X[outlier_mask], outlier_mask
 
 def create_autoencoder(input_dim, config):
-    """Criar arquitetura do autoencoder adaptativa"""
+    """Criar arquitetura do autoencoder baseada nos multiplicadores"""
     print(f"🏗️ Construindo autoencoder para {input_dim} features...")
     
-    # Determinar arquitetura baseada no número de features
-    if input_dim <= 3:
-        arch = config['model']['architecture']['three_features']
-    elif input_dim <= 5:
-        arch = config['model']['architecture']['five_features']
-    else:
-        arch = config['model']['architecture']['many_features']
-    
-    encoder_dims = arch['encoder_dims']
-    bottleneck_dim = arch['bottleneck_dim']
-    dropout_rates = config['model']['dropout_rates']
+    # Arquitetura baseada nos multiplicadores (4×D, 2×D, D)
+    multipliers = config['architecture']['multipliers']
+    encoder_dims = [input_dim * mult for mult in multipliers]  # [4×D, 2×D]
+    bottleneck_dim = config['architecture']['bottleneck']
+    dropout_rates = config['architecture']['dropout']
     
     print(f"Arquitetura: {input_dim} → {encoder_dims[0]} → {encoder_dims[1]} → {bottleneck_dim} → {encoder_dims[1]} → {encoder_dims[0]} → {input_dim}")
     
@@ -138,9 +127,9 @@ def create_autoencoder(input_dim, config):
     
     optimizer_config = config['model']['optimizer']
     optimizer = Adam(
-        learning_rate=optimizer_config['learning_rate'],
-        beta_1=optimizer_config['beta_1'],
-        beta_2=optimizer_config['beta_2']
+        learning_rate=float(optimizer_config['learning_rate']),
+        beta_1=float(optimizer_config['beta_1']),
+        beta_2=float(optimizer_config['beta_2'])
     )
     
     ae.compile(
@@ -169,7 +158,7 @@ def create_callbacks(config):
         patience=es_config['patience'],
         restore_best_weights=es_config['restore_best_weights'],
         verbose=1,
-        min_delta=es_config['min_delta']
+        min_delta=float(es_config['min_delta'])
     )
     
     # Model checkpoint
@@ -186,9 +175,9 @@ def create_callbacks(config):
     rlr_config = training_config['reduce_lr']
     rlr = ReduceLROnPlateau(
         monitor='val_loss',
-        factor=rlr_config['factor'],
+        factor=float(rlr_config['factor']),
         patience=rlr_config['patience'],
-        min_lr=rlr_config['min_lr'],
+        min_lr=float(rlr_config['min_lr']),
         verbose=1
     )
     
@@ -198,37 +187,33 @@ def create_callbacks(config):
     return callbacks
 
 def determine_batch_size(train_size, config):
-    """Determinar batch size baseado no tamanho do dataset"""
-    batch_config = config['training']['batch_size']
-    
-    if train_size < 1000:
-        return batch_config['small_dataset']
-    elif train_size < 5000:
-        return batch_config['medium_dataset']
-    else:
-        return batch_config['large_dataset']
+    """Determinar batch size baseado na configuração"""
+    return config['training']['batch_size']
 
 def calculate_thresholds(reconstruction_errors):
-    """Calcular thresholds para detecção de anomalias"""
+    """Calcular thresholds para detecção de anomalias - Configuração BALANCEADA"""
     error_stats = {
         'mean': np.mean(reconstruction_errors),
         'std': np.std(reconstruction_errors),
         'median': np.median(reconstruction_errors),
         'q95': np.percentile(reconstruction_errors, 95),
+        'q97': np.percentile(reconstruction_errors, 97),  # Mais conservador
         'q99': np.percentile(reconstruction_errors, 99),
         'max': np.max(reconstruction_errors)
     }
     
-    # Métodos de threshold
-    threshold_95 = error_stats['q95']
-    threshold_mean_plus_3std = error_stats['mean'] + 3 * error_stats['std']
+    # Métodos de threshold conservadores
+    threshold_97 = error_stats['q97']                    # P97 em vez de P95
+    threshold_mean_plus_2std = error_stats['mean'] + 2 * error_stats['std']  # 2σ em vez de 3σ
     
-    # Threshold conservador (menor dos dois)
-    suggested_threshold = min(threshold_95, threshold_mean_plus_3std)
+    # Threshold conservador (menor dos dois - mais restritivo)
+    suggested_threshold = min(threshold_97, threshold_mean_plus_2std)
     
     threshold_info = {
-        'threshold_95_percentile': threshold_95,
-        'threshold_mean_plus_3std': threshold_mean_plus_3std,
+        'threshold_95_percentile': error_stats['q95'],
+        'threshold_97_percentile': threshold_97,
+        'threshold_mean_plus_2std': threshold_mean_plus_2std,
+        'threshold_mean_plus_3std': error_stats['mean'] + 3 * error_stats['std'],
         'suggested_threshold': suggested_threshold,
         'validation_error_stats': error_stats
     }
@@ -236,74 +221,55 @@ def calculate_thresholds(reconstruction_errors):
     return threshold_info
 
 def save_training_plots(history, config):
-    """Salvar plots do treinamento"""
+    """Salvar curva de loss como loss_curve.png"""
     if not config.get('flags', {}).get('save_plots', True):
         return
     
     figures_dir = config['output'].get('figures_dir', 'model/figures')
     os.makedirs(figures_dir, exist_ok=True)
     
-    # Plot de loss
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 5))
-    
-    # Loss
-    ax1.plot(history.history['loss'], label='Treino', color='blue')
-    ax1.plot(history.history['val_loss'], label='Validação', color='red')
-    ax1.set_title('Loss durante o Treinamento')
-    ax1.set_xlabel('Época')
-    ax1.set_ylabel('MSE Loss')
-    ax1.legend()
-    ax1.grid(True, alpha=0.3)
-    
-    # MAE
-    if 'mae' in history.history:
-        ax2.plot(history.history['mae'], label='Treino', color='blue')
-        ax2.plot(history.history['val_mae'], label='Validação', color='red')
-        ax2.set_title('MAE durante o Treinamento')
-        ax2.set_xlabel('Época')
-        ax2.set_ylabel('MAE')
-        ax2.legend()
-        ax2.grid(True, alpha=0.3)
-    
+    # Plot de loss (training vs validation)
+    plt.figure(figsize=(10, 6))
+    plt.plot(history.history['loss'], label='Training Loss', color='blue', linewidth=2)
+    plt.plot(history.history['val_loss'], label='Validation Loss', color='red', linewidth=2)
+    plt.title('Training vs Validation Loss', fontsize=14, fontweight='bold')
+    plt.xlabel('Epoch', fontsize=12)
+    plt.ylabel('MSE Loss', fontsize=12)
+    plt.legend(fontsize=11)
+    plt.grid(True, alpha=0.3)
     plt.tight_layout()
-    plt.savefig(os.path.join(figures_dir, 'training_history.png'), dpi=300, bbox_inches='tight')
+    plt.savefig(os.path.join(figures_dir, 'loss_curve.png'), dpi=300, bbox_inches='tight')
     plt.close()
     
-    print(f"✅ Plot de treinamento salvo em {figures_dir}/training_history.png")
+    print(f"✅ Loss curve salva em {figures_dir}/loss_curve.png")
 
-def save_reconstruction_analysis(reconstruction_errors, config):
-    """Salvar análise dos erros de reconstrução"""
+def save_reconstruction_analysis(reconstruction_errors, threshold_info, config):
+    """Salvar histograma de erros como error_histogram.png"""
     if not config.get('flags', {}).get('save_plots', True):
         return
     
     figures_dir = config['output'].get('figures_dir', 'model/figures')
     
-    # Histograma dos erros de reconstrução
-    plt.figure(figsize=(12, 4))
+    # Histograma dos erros de reconstrução com threshold
+    plt.figure(figsize=(10, 6))
+    plt.hist(reconstruction_errors, bins=50, alpha=0.7, color='lightblue', 
+             edgecolor='black', label='Normal Traffic')
     
-    plt.subplot(1, 2, 1)
-    plt.hist(reconstruction_errors, bins=50, alpha=0.7, color='skyblue', edgecolor='black')
-    plt.axvline(np.mean(reconstruction_errors), color='red', linestyle='--', 
-                label=f'Média: {np.mean(reconstruction_errors):.6f}')
-    plt.axvline(np.percentile(reconstruction_errors, 95), color='orange', linestyle='--',
-                label=f'P95: {np.percentile(reconstruction_errors, 95):.6f}')
-    plt.title('Distribuição dos Erros de Reconstrução')
-    plt.xlabel('Erro de Reconstrução (MSE)')
-    plt.ylabel('Frequência')
-    plt.legend()
+    # Adicionar linha do threshold
+    threshold = threshold_info['suggested_threshold']
+    plt.axvline(threshold, color='red', linestyle='--', linewidth=2,
+                label=f'Threshold (P97): {threshold:.6f}')
+    
+    plt.title('Reconstruction Error Distribution', fontsize=14, fontweight='bold')
+    plt.xlabel('Reconstruction Error (MSE)', fontsize=12)
+    plt.ylabel('Frequency', fontsize=12)
+    plt.legend(fontsize=11)
     plt.grid(True, alpha=0.3)
-    
-    plt.subplot(1, 2, 2)
-    plt.boxplot(reconstruction_errors)
-    plt.title('Boxplot dos Erros de Reconstrução')
-    plt.ylabel('Erro de Reconstrução (MSE)')
-    plt.grid(True, alpha=0.3)
-    
     plt.tight_layout()
-    plt.savefig(os.path.join(figures_dir, 'reconstruction_analysis.png'), dpi=300, bbox_inches='tight')
+    plt.savefig(os.path.join(figures_dir, 'error_histogram.png'), dpi=300, bbox_inches='tight')
     plt.close()
     
-    print(f"✅ Análise de reconstrução salva em {figures_dir}/reconstruction_analysis.png")
+    print(f"✅ Error histogram salvo em {figures_dir}/error_histogram.png")
 
 def main():
     """Função principal"""
@@ -449,7 +415,7 @@ def main():
     
     # 14. Gerar visualizações
     save_training_plots(history, config)
-    save_reconstruction_analysis(reconstruction_errors, config)
+    save_reconstruction_analysis(reconstruction_errors, threshold_info, config)
     
     print("💾 Artefatos salvos:")
     artifacts = [

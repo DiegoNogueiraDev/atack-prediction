@@ -1,4 +1,4 @@
-# Configuração do modelo baseada no EDA
+# Configuração BALANCEADA do modelo baseada no EDA
 # config/model_config.yaml
 
 data:
@@ -6,47 +6,23 @@ data:
   normal_label: 0
   attack_label: 1
 
-features:
-  # Features significativas baseadas nos testes estatísticos do EDA
-  significant: ["bytes", "pkts", "iat_mean"]
-  # Features removidas por não serem estatisticamente significativas
-  non_significant: ["duration", "iat_std"]
-  # Usar apenas features significativas por padrão
-  use_only_significant: true
+features_used: ['bytes', 'pkts', 'iat_mean']
 
-preprocessing:
-  # Aplicar transformações para reduzir skewness
-  apply_transformations: true
-  # Features para Box-Cox (apenas valores positivos)
-  boxcox_features: ["bytes"]
-  # Features para Yeo-Johnson (pode ter zeros)
-  yeojohnson_features: ["pkts", "iat_mean"]
-  # Estratégia de imputação para valores ausentes
-  imputation_strategy: "median"
-  # Remover outliers extremos (z-score > threshold)
-  remove_outliers: false
-  outlier_threshold: 4.0
+imputation:
+  strategy: 'median'
+
+transformers:
+  boxcox: ['bytes']
+  yeo_johnson: ['pkts', 'iat_mean']
+
+scaler: StandardScaler
+
+architecture:
+  multipliers: [4, 2]       # 4×D e 2×D
+  bottleneck: 3             # D=3 para preservar nuances
+  dropout: [0.3, 0.2, 0.2, 0.3]
 
 model:
-  # Arquitetura adaptativa baseada no número de features
-  architecture:
-    # Para 3 features (significativas)
-    three_features:
-      encoder_dims: [12, 6]
-      bottleneck_dim: 3
-    # Para 5 features (todas)
-    five_features:
-      encoder_dims: [32, 16]
-      bottleneck_dim: 8
-    # Para mais features (futuro)
-    many_features:
-      encoder_dims: [64, 32]
-      bottleneck_dim: 16
-  
-  # Regularização
-  dropout_rates: [0.2, 0.1, 0.1, 0.2]  # encoder1, encoder2, decoder1, decoder2
-  
-  # Compilação
   optimizer:
     name: "adam"
     learning_rate: 0.001
@@ -56,59 +32,43 @@ model:
   metrics: ["mae"]
 
 training:
-  # Divisão dos dados
-  validation_split: 0.2
-  test_split: 0.2
+  batch_size: 32
+  learning_rate: 0.001
+  epochs: 200
+  validation_split: 0.25
   random_state: 42
   
-  # Parâmetros de treinamento
-  epochs: 150
-  batch_size:
-    small_dataset: 16    # < 1000 amostras
-    medium_dataset: 32   # 1000-5000 amostras
-    large_dataset: 64    # > 5000 amostras
-  
-  # Callbacks
   early_stopping:
-    patience: 15
+    monitor: 'val_loss'
+    patience: 20
     min_delta: 1e-5
     restore_best_weights: true
   
   reduce_lr:
     factor: 0.5
-    patience: 8
+    patience: 10
     min_lr: 1e-6
   
   model_checkpoint:
     save_best_only: true
     save_weights_only: false
 
-evaluation:
-  # Threshold para detecção de anomalias
-  threshold_methods: ["percentile_95", "mean_plus_3std"]
-  # Usar o menor entre os dois métodos como threshold conservador
-  use_conservative_threshold: true
-  
-  # Métricas para salvar
-  save_reconstruction_stats: true
-  save_training_plots: true
-  save_threshold_analysis: true
+threshold:
+  percentile: 97
+  sigma_multiplier: 2
+
+preprocessing:
+  apply_transformations: true
+  remove_outliers: true
+  outlier_threshold: 3.5
+  validation_split: 0.25
 
 output:
   model_dir: "model"
   figures_dir: "model/figures"
   reports_dir: "reports"
-  
-  # Artefatos a salvar
-  save_artifacts:
-    - "autoencoder.h5"
-    - "preprocessor.pkl"
-    - "threshold_info.pkl"
-    - "model_config.pkl"
-    - "history.csv"
 
 reproducibility:
-  # Seeds para reprodutibilidade
   numpy_seed: 42
   tensorflow_seed: 42
   python_seed: 42
