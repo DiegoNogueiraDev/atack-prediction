@@ -1,0 +1,2 @@
+model,accuracy,precision,recall,f1_score,roc_auc,pr_auc,fpr,threshold
+v4_sequence_lstm_attention,0.6514522821576764,0.0,0.0,0.0,0.5052208835341365,0.3008303392412037,0.05421686746987952,3.8721569930772035

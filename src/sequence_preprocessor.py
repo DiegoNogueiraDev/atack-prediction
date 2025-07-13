@@ -120,8 +120,15 @@ class SequencePreprocessor:
         """Fit the preprocessor on training data"""
         logger.info("🔧 Fitting sequence preprocessor...")
         
+        # Clean data: handle NaN values
+        df_clean = df.copy()
+        for feature in self.features:
+            if df_clean[feature].isnull().any():
+                logger.warning(f"⚠️ Found {df_clean[feature].isnull().sum()} NaN values in {feature}, filling with 0")
+                df_clean[feature] = df_clean[feature].fillna(0.0)
+        
         # Group flows by connection
-        grouped_flows = self._group_flows_by_connection(df)
+        grouped_flows = self._group_flows_by_connection(df_clean)
         
         # Create sequences
         sequences, labels = self._create_sequences(grouped_flows, include_labels=True)
@@ -155,8 +162,15 @@ class SequencePreprocessor:
             
         logger.info("🔄 Transforming data into sequences...")
         
+        # Clean data: handle NaN values
+        df_clean = df.copy()
+        for feature in self.features:
+            if df_clean[feature].isnull().any():
+                logger.warning(f"⚠️ Found {df_clean[feature].isnull().sum()} NaN values in {feature}, filling with 0")
+                df_clean[feature] = df_clean[feature].fillna(0.0)
+        
         # Group flows
-        grouped_flows = self._group_flows_by_connection(df)
+        grouped_flows = self._group_flows_by_connection(df_clean)
         
         # Create sequences
         sequences, labels = self._create_sequences(grouped_flows, include_labels=include_labels)
